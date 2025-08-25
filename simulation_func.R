@@ -192,8 +192,8 @@ data_step_func <- function(n, k, s11, s12, s13, b, censoring_prop, seednum){
 }
 
 
-## Add another to call the EM_algorithm, get the standard errors, get the NIE estimates from the Delta method
-
+## Add another function to call the EM_algorithm, get the standard errors, get the NIE estimates from the Delta method
+## using parallel compute.
 
 
 
@@ -204,9 +204,20 @@ all_res <- foreach(i = 1:num_sim, .packages = c( "foreach", "doParallel")) %dopa
 }
 
 
+## testing out some outs
+out <-all_res[[2]]
+
+m_k <-as.vector(out$dat$M[,1])
+par_vec <-as.vector(unname(out$par_mat[1,]))
+EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
+stdError <-EM_stderror(EM_result)
+NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
+se.nie <-SE_nie(EM_result$par, EM_result$hessian, NIE_func, x1 = 0, x2 = 1, alpha = 0.05)
+se.nie
 
 
-save(all_res, file = file_name)
+
+#save(all_res, file = file_name)
 
 if (exists("cl") && inherits(cl, "cluster")) parallel::stopCluster(cl)
 

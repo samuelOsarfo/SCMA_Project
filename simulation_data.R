@@ -94,7 +94,7 @@ gen_T <- function(X,
 # Generate censoring status
 #---------------------------
 
-gen_censoring_status <-function(T, censoring_prop){
+gen_censoring_status <-function(T_true, censoring_prop){
   
   # Generate censoring times to achieve desired censoring proportion
   # A common way is to generate from an exponential distribution (Is this correct?)

@@ -401,6 +401,48 @@ Q_func <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL, eta0) {
 }
 
 
+#-------------------------------------------------------------------------------
+#  
+#-------------------------------------------------------------------------------
+observed_loglik <- function(par_vec, t_vec, m_k_vec, x_vec, d_vec, s_vec, conf_matrix = NULL) {
+  # Pre-calculate log-likelihoods for all subjects for each possible case
+  # Note: For a given subject, only one of these will be used based on m_k_vec[i]
+  
+  # Likelihood for observed positive mediators (m_k > 0)
+  loglik_pos <- li1_1_vec(par_vec, t_vec, m_k_vec, x_vec, conf_matrix, d_vec)
+  
+  # Likelihood for true-zero mediators (contribution if C_i=0)
+  loglik_truezero <- li0_2_vec(par_vec, t_vec, x_vec, conf_matrix, d_vec)
+  
+  # Likelihood for undetected-zero mediators (contribution if C_i=1)
+  loglik_undetected <- li1_2_vec(par_vec, t_vec, x_vec, conf_matrix, d_vec, s_vec)
+  
+  
+  # Initialize the total log-likelihood
+  total_loglik <- 0
+  n <- length(t_vec)
+  
+  for (i in 1:n) {
+    if (m_k_vec[i] > 0) {
+      # Case 2a: Observed positive -> definitely C_i=1
+      total_loglik <- total_loglik + loglik_pos[i]
+      
+    } else if (m_k_vec[i] == 0) {
+      # Could be either true zero (C_i=0) or undetected (C_i=1)
+      # We need to sum the likelihoods from both latent classes
+      # log( P(C=0)*f(data|C=0) + P(C=1)*f(data|C=1) )
+      #    = log( exp(loglik_truezero[i]) + exp(loglik_undetected[i]) )
+      
+      # Use log-sum-exp for numerical stability
+      max_val <- max(loglik_truezero[i], loglik_undetected[i])
+      total_loglik <- total_loglik + max_val + log(exp(loglik_truezero[i] - max_val) + exp(loglik_undetected[i] - max_val))
+    }
+  }
+  
+  return(total_loglik)
+}
+
+
 
 #-------------------------------------------------------------------------------
 # MAIN EM ALGORITHM
@@ -437,23 +479,25 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
     
     # Update parameters
     par_current <- opt_result$par
-    current_loglik <- -opt_result$value
+    
+    current_obs_loglik <- observed_loglik(par_current, t, m_k, x, d, s, conf_mat)   
     hess_final  <- opt_result$hessian
     
+  
     # Check convergence (relative log-likelihood change)
-    if(iter > 1 && abs(current_loglik - prev_loglik) < tol) {
+    if(iter > 1 && abs(current_obs_loglik - prev_obs_loglik) < tol) {
       converged <- TRUE
     }
-    prev_loglik <- current_loglik
+    prev_obs_loglik <- current_obs_loglik
     
     # Optional: Print progress
-    cat(sprintf("Iteration %d: log-likelihood = %.4f\n", iter, current_loglik))
+    cat(sprintf("Iteration %d: log-likelihood = %.4f\n", iter, current_obs_loglik))
   }
   
   # Return results
   list(
     par = par_current,
-    loglik = current_loglik,
+    loglik = current_obs_loglik,
     iterations = iter,
     hessian    = hess_final,
     converged = converged
@@ -482,6 +526,7 @@ EM_stderror <-function(em_result){
 }
 
 
+stdError <-EM_stderror(EM_result)
 
 #-------------------------------------
 #  NIE Estimation
@@ -523,6 +568,8 @@ NIE_func <- function(par, x1 = 0, x2 = 1) {
   return(NIE_total)
 }
 
+
+NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
 
 #-------------------------------
 # Std_Error for NIE From the Delta Method
@@ -571,7 +618,12 @@ SE_nie <- function(par_est, hessian, nie_function, x1 = 0, x2 = 1, alpha = 0.05)
   return(invisible(results))
 }
 
-
-
+# m_k <-as.vector(out$dat$M[,10])
+# par_vec <-as.vector(unname(out$par_mat[10,]))
+# EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
+# stdError <-EM_stderror(EM_result)
+# NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
+# se.nie <-SE_nie(EM_result$par, EM_result$hessian, NIE_func, x1 = 0, x2 = 1, alpha = 0.05)
+# se.nie
 
 
