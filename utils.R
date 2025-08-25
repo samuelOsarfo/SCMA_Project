@@ -487,11 +487,9 @@ EM_stderror <-function(em_result){
 #  NIE Estimation
 #-------------------------------------
 
-# Define the expit (inverse logit) function for clarity
-expit <- function(x) { 1 / (1 + exp(-x)) }
 
 NIE_func <- function(par, x1 = 0, x2 = 1) {
-
+  
   beta_k <- par[2]   # beta
   tau_k  <- par[4]   # tau
   alpha_k <- par[3]  # alpha
@@ -505,24 +503,72 @@ NIE_func <- function(par, x1 = 0, x2 = 1) {
  
   
   #----------------------------------------------------------------------
-  # Calculate Components for conNIE1 (Equation 28)
+  # Calculate Components for NIE_1 (Equation 28) :: There are no covariates for now
   #----------------------------------------------------------------------
   
-  NIE1 <- 1 #test
+  NIE_1 <- (beta_k + tau_k*x2)*( (plogis(omega0_2 + omega1_2*x2)* (1- plogis(omega0_1 + omega1_1*x2))) - (plogis(omega0_2 + omega1_2*x1)* (1- plogis(omega0_1 + omega1_1*x1))) )
   
   
   #----------------------------------------------------------------------
   # Calculate NIE_2 (Equation 29) :: There are no covariates for now
   #----------------------------------------------------------------------
   # Effect through change in presence/absence probability
-  NIE_2 <- (alpha_k + zeta_k * x2) * (plogis(omega0_2 + omega_1_2*x1) - plogis(omega0_2 +omega_1_2*x2))
+  NIE_2 <- (alpha_k + zeta_k * x2) * (plogis(omega0_2 + omega1_2*x1) - plogis(omega0_2 +omega1_2*x2))
   
   #----------------------------------------------------------------------
   # Total Conditional NIE (Sum of both pathways)
   #----------------------------------------------------------------------
-  NIE_total <- NIE_1 + conNIE_2
+  NIE_total <- NIE_1 + NIE_2
   
-  return(conNIE_total)
+  return(NIE_total)
+}
+
+
+#-------------------------------
+# Std_Error for NIE From the Delta Method
+#------------------------------
+
+
+SE_nie <- function(par_est, hessian, nie_function, x1 = 0, x2 = 1, alpha = 0.05) {
+  # Step b: Compute the Gradient (G) of the NIE function
+  #         with respect to the parameters, at the estimated values.
+  gradient <- grad(func = nie_function, x = par_est, x1 = x1, x2 = x2)
+  
+  # Step c: Compute the Covariance Matrix and then the Variance of the NIE
+  #         The Hessian from the M-step is -d²Q/dΘ², which is the observed Fisher information.
+  cov_matrix <- ginv(hessian) # Invert the Hessian to get the covariance matrix
+  var_nie <- t(gradient) %*% cov_matrix %*% gradient # G' * Cov(Θ) * G
+  se_nie <- sqrt(var_nie) # Standard error of the NIE
+  
+  # Step d: Compute the Point Estimate, Confidence Interval, and P-value
+  nie_estimate <- nie_function(par_est, x1 = x1, x2 = x2) # Point estimate
+  
+  # Wald test statistic
+  z_value <- nie_estimate / se_nie
+  
+  # Two-sided p-value
+  p_value <- 2 * pnorm(-abs(z_value))
+  
+  # Critical value for (1-alpha/2) confidence (e.g., 1.96 for 95% CI)
+  z_critical <- qnorm(1 - alpha/2)
+  
+  # Confidence Interval
+  ci_lower <- nie_estimate - z_critical * se_nie
+  ci_upper <- nie_estimate + z_critical * se_nie
+  
+  # Step e: Organize and Return Results
+  results <- data.frame(
+    Estimate = nie_estimate,
+    SE = as.numeric(se_nie), # Convert 1x1 matrix to numeric
+    CI_lower = ci_lower,
+    CI_upper = ci_upper,
+    z_value = z_value,
+    p_value = p_value
+  )
+  
+  
+  # Return the results invisibly (so they can be stored in a variable)
+  return(invisible(results))
 }
 
 

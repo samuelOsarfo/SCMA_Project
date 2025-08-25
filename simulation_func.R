@@ -4,6 +4,7 @@ rm(list = ls())
 require(doParallel)
 require(foreach)
 require(MASS)
+require(numDeriv)
 
 
 num_cores <- 11
