@@ -271,10 +271,8 @@ li1_2 <- function(par_vec, ti, xi, conf_vec=NULL, di, si) {
       surv_part <- pnorm(epsilon_ik, lower.tail = FALSE)
     }
     
-    # Beta density for mediator
-    beta_part <- dbeta(m, mu_ik * p$phi, (1 - mu_ik) * p$phi)
     
-    surv_part * beta_part
+    surv_part
   }
   
   # numerical integration
@@ -289,8 +287,11 @@ li1_2 <- function(par_vec, ti, xi, conf_vec=NULL, di, si) {
   }
   )
   
+  # Beta density for mediator
+  beta_part <- beta(mu_ik * p$phi, (1 - mu_ik) * p$phi)
+  
   # likelihood component
-  joint_density <- (1 - delta_ik) * int_result
+  joint_density <- (1 - delta_ik) *(1/beta_part) *int_result
   
   log(max(joint_density, 1e-100))
 }
@@ -402,7 +403,7 @@ Q_func <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL, eta0) {
 
 
 #-------------------------------------------------------------------------------
-#  
+#  Observed log-lokelihood value
 #-------------------------------------------------------------------------------
 observed_loglik <- function(par_vec, t_vec, m_k_vec, x_vec, d_vec, s_vec, conf_matrix = NULL) {
   # Pre-calculate log-likelihoods for all subjects for each possible case
@@ -510,28 +511,29 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
 #------------------------------------
 
 
-EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
+#EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
 
 
-# After EM converges:
-EM_stderror <-function(em_result){
-  
-  hessian <- em_result$hessian  # Extract Hessian (this is already -d²Q/dΘ²)
-  
-  
-  cov_matrix <- ginv(hessian)   # Invert to get covariance matrix
-  
-  sqrt(diag(cov_matrix))
-  
-}
-
-
-stdError <-EM_stderror(EM_result)
+# # After EM converges:
+# EM_stderror <-function(em_result){
+#   
+#   hessian <- em_result$hessian  # Extract Hessian (this is already -d²Q/dΘ²)
+#   
+#   
+#   cov_matrix <- ginv(hessian)   # Invert to get covariance matrix
+#   
+#   sqrt(diag(cov_matrix))
+#   
+# }
+# 
+# 
+# stdError <-EM_stderror(EM_result)
 
 #-------------------------------------
 #  NIE Estimation
 #-------------------------------------
 
+expit<- function(x){1/(1 + exp(-x))}
 
 NIE_func <- function(par, x1 = 0, x2 = 1) {
   
@@ -551,40 +553,57 @@ NIE_func <- function(par, x1 = 0, x2 = 1) {
   # Calculate Components for NIE_1 (Equation 28) :: There are no covariates for now
   #----------------------------------------------------------------------
   
-  NIE_1 <- (beta_k + tau_k*x2)*( (plogis(omega0_2 + omega1_2*x2)* (1- plogis(omega0_1 + omega1_1*x2))) - (plogis(omega0_2 + omega1_2*x1)* (1- plogis(omega0_1 + omega1_1*x1))) )
+  NIE_1 <- (beta_k + tau_k*x2)*( (expit(omega0_2 + omega1_2*x2)* (1- expit(omega0_1 + omega1_1*x2))) - (expit(omega0_2 + omega1_2*x1)* (1- expit(omega0_1 + omega1_1*x1))) )
   
-  
+  NIE_11 <-(beta_k + tau_k*x2)*( (expit(omega0_2 + omega1_2*x2) - expit(omega0_2 + omega1_2*x1)) - (expit(omega0_2 + omega1_2*x2)*expit(omega0_1 + omega1_1*x2) -expit(omega0_2 + omega1_2*x1)*expit(omega0_1 + omega1_1*x1)) )
   #----------------------------------------------------------------------
   # Calculate NIE_2 (Equation 29) :: There are no covariates for now
   #----------------------------------------------------------------------
   # Effect through change in presence/absence probability
-  NIE_2 <- (alpha_k + zeta_k * x2) * (plogis(omega0_2 + omega1_2*x1) - plogis(omega0_2 +omega1_2*x2))
+  NIE_2 <- (alpha_k + zeta_k * x2) * (expit(omega0_2 + omega1_2*x1) - expit(omega0_2 +omega1_2*x2))
   
   #----------------------------------------------------------------------
   # Total Conditional NIE (Sum of both pathways)
   #----------------------------------------------------------------------
   NIE_total <- NIE_1 + NIE_2
-  
+  print(NIE_1)
+  print(NIE_11)
+  print(NIE_2)
   return(NIE_total)
 }
 
 
-NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
+#NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
 
 #-------------------------------
 # Std_Error for NIE From the Delta Method
 #------------------------------
 
 
-SE_nie <- function(par_est, hessian, nie_function, x1 = 0, x2 = 1, alpha = 0.05) {
+
+
+# m_k <-as.vector(out$dat$M[,10])
+# par_vec <-as.vector(unname(out$par_mat[10,]))
+# EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
+# stdError <-EM_stderror(EM_result)
+# NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
+# se.nie <-SE_nie(EM_result$par, EM_result$hessian, NIE_func, x1 = 0, x2 = 1, alpha = 0.05)
+# se.nie
+
+
+
+
+
+
+
+SE_nie <- function(par_est, nie_function, x1 = 0, x2 = 1, alpha = 0.05,cov_mat) {
   # Step b: Compute the Gradient (G) of the NIE function
   #         with respect to the parameters, at the estimated values.
   gradient <- grad(func = nie_function, x = par_est, x1 = x1, x2 = x2)
   
   # Step c: Compute the Covariance Matrix and then the Variance of the NIE
   #         The Hessian from the M-step is -d²Q/dΘ², which is the observed Fisher information.
-  cov_matrix <- ginv(hessian) # Invert the Hessian to get the covariance matrix
-  var_nie <- t(gradient) %*% cov_matrix %*% gradient # G' * Cov(Θ) * G
+  var_nie <- t(gradient) %*% cov_mat %*% gradient # G' * Cov(Θ) * G
   se_nie <- sqrt(var_nie) # Standard error of the NIE
   
   # Step d: Compute the Point Estimate, Confidence Interval, and P-value
@@ -615,15 +634,6 @@ SE_nie <- function(par_est, hessian, nie_function, x1 = 0, x2 = 1, alpha = 0.05)
   
   
   # Return the results invisibly (so they can be stored in a variable)
-  return(invisible(results))
+  return(results)
 }
-
-# m_k <-as.vector(out$dat$M[,10])
-# par_vec <-as.vector(unname(out$par_mat[10,]))
-# EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
-# stdError <-EM_stderror(EM_result)
-# NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
-# se.nie <-SE_nie(EM_result$par, EM_result$hessian, NIE_func, x1 = 0, x2 = 1, alpha = 0.05)
-# se.nie
-
 

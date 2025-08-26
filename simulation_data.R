@@ -39,7 +39,7 @@ gen_meds <- function(X,
   
   # ---- simulate positive abundances ----
   for (j in seq_len(k)) {
-    idx <- which(Ipos[, j] == 1L)
+    idx <- which(Ipos[, j] == 1)
     if (length(idx)) {
       shape1 <- mu[idx, j] * phi[j]
       shape2 <- (1 - mu[idx, j]) * phi[j]

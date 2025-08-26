@@ -45,8 +45,8 @@ censoring_prop = as.numeric(args[7])
 
 
 
-n<-25                # sample size
-k <- 30              # total number of mediators
+n<-500                # sample size
+k <- 2000              # total number of mediators
 s11 <-3              # number of true mediators under scenario 1
 s12 <-3              # number of true mediators under scenario 2
 s13 <-4              # number of true mediators under scenario 1
@@ -160,7 +160,7 @@ data_step_func <- function(n, k, s11, s12, s13, b, censoring_prop, seednum){
   
   
   X <- matrix(rbinom(n, 1, 0.6), nrow = n, ncol = 1)
-  phi <- 10   # dispersion parameter for beta distribution
+  phi <- 5   # dispersion parameter for beta distribution
   
   
   dat <- gen_data(
@@ -205,14 +205,25 @@ all_res <- foreach(i = 1:num_sim, .packages = c( "foreach", "doParallel")) %dopa
 
 
 ## testing out some outs
-out <-all_res[[2]]
+out <-all_res[[1]]
 
-m_k <-as.vector(out$dat$M[,1])
-par_vec <-as.vector(unname(out$par_mat[1,]))
+m_k <-as.vector(out$dat$M[,6])
+x<-as.vector(out$dat$X)
+d<-as.vector(out$dat$d)
+t<-as.vector(out$dat$T_true)
+s<-as.vector(out$dat$s)
+par_vec <-as.vector(unname(out$par_mat[6,]))
 EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
-stdError <-EM_stderror(EM_result)
+
+# 2. Compute the OBSERVED-DATA Hessian at the final parameter estimates
+H_observed <- hessian(func = observed_loglik, x=EM_result$par,t_vec = t, m_k_vec = m_k, x_vec = x, d_vec = d, s_vec = s)
+
+# 3. Invert the observed Hessian to get the CORRECT covariance matrix
+#    Note: The observed Hessian is -d²L/dΘ², so we invert -H_observed to get Cov(Θ)
+cov_matrix <- ginv(-H_observed)
+
 NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
-se.nie <-SE_nie(EM_result$par, EM_result$hessian, NIE_func, x1 = 0, x2 = 1, alpha = 0.05)
+se.nie <-SE_nie(EM_result$par, NIE_func, x1 = 0, x2 = 1, alpha = 0.05, cov_matrix)
 se.nie
 
 
