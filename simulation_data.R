@@ -10,20 +10,19 @@ gen_meds <- function(X,
                      ) { 
   n<- length(X)
   k<- length(omega_0_1)
-  phi <- rep(phi, k)
+
   
   
   # ---- allocate ----
   delta <- matrix(0, n, k)   # P(M=0)
   mu    <- matrix(0, n, k)   # E[M | M>0]
-  Ipos  <- matrix(0L, n, k)         # presence indicator: 1 if present, 0 if zero
+  Ipos  <- matrix(0, n, k)         # presence indicator: 1 if present, 0 if zero
   M     <- matrix(0, n, k)          # mediator values in [0,1]
   
   
   # ---- parameter matrices (k x 2), then transpose to 2 x k ----
   params_1 <- cbind(omega_0_1, omega_1_1) # zero part
   params_2 <- cbind(omega_0_2, omega_1_2) # positive part
-  
   
   
   # ---- linear predictors ----
@@ -37,15 +36,56 @@ gen_meds <- function(X,
   # ---- simulate presence ----
   Ipos[] <- rbinom(n * k, size = 1, prob = 1 - delta)  # 1 = present
   
+  
+  
   # ---- simulate positive abundances ----
-  for (j in seq_len(k)) {
-    idx <- which(Ipos[, j] == 1)
-    if (length(idx)) {
-      shape1 <- mu[idx, j] * phi[j]
-      shape2 <- (1 - mu[idx, j]) * phi[j]
-      M[idx, j] <- rbeta(length(idx), shape1 = shape1, shape2 = shape2)
+  for (j in seq_len(n)) {
+    #j=1
+    idx <- which(Ipos[j, ] == 1)
+    
+
+    #weights <- gen_weights(length(idx))
+    fixed_idx <-sample(seq_along(idx), 1)               # select some random index from idx to enforce unit-sum-constraint
+    comp_results <-numeric(length(idx))
+    shape1 <- mu[j, idx] * phi
+    shape2 <- (1 - mu[j, idx]) * phi
+    
+    
+    
+    for(col_i in seq_along(idx) ){
+      
+       print(col_i)
+       if(col_i == fixed_idx){
+         print(col_i)
+         next
+       } 
+      
+      
+      beta_sample2<-rbeta(1, shape1[col_i], shape2[col_i])  #sample from the beta distribution
+
+
+      cat('beta_distr= ',beta_sample2)
+
+
+       comp_results[col_i] <- beta_sample2
     }
-  }
+    
+    sum_others <- sum(comp_results[-fixed_idx])
+    comp_results[fixed_idx] <-  1 - sum_others  
+    
+    M[j, idx] <- comp_results
+
+      }
+      
+      
+    
+    
+    # Calculate the fixed weight to maintain sum constraint
+    
+    
+    
+    
+  
   
   # return matrices and vectors
   list(M = M, Ipos = Ipos, mu = mu, delta = delta)

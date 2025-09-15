@@ -5,6 +5,8 @@ require(doParallel)
 require(foreach)
 require(MASS)
 require(numDeriv)
+require(MCMCpack)
+require(truncdist)
 
 
 num_cores <- 11
@@ -38,18 +40,18 @@ args = commandArgs(trailingOnly = TRUE)
 n = as.numeric(args[1])
 k = as.numeric(args[2])
 s11 =as.numeric(args[3])
-s12 =as.numeric(args[4])
-s13 =as.numeric(args[5])
-b = as.numeric(args[6])
+#s12 =as.numeric(args[4])
+#s13 =as.numeric(args[5])
+#b = as.numeric(args[6])
 censoring_prop = as.numeric(args[7])
 
 
 
-n<-500                # sample size
-k <- 2000              # total number of mediators
-s11 <-3              # number of true mediators under scenario 1
-s12 <-3              # number of true mediators under scenario 2
-s13 <-4              # number of true mediators under scenario 1
+n<-100                # sample size
+k <- 600           # total number of mediators
+s11 <-5              # number of true mediators under scenario 1
+#s12 <-3              # number of true mediators under scenario 2
+#s13 <-4              # number of true mediators under scenario 1
 b <- 0.8             # scale parameter for log-weibull distribution (in AFT model)
 censoring_prop <- round(runif(1, 0.1, 0.25),2)     # censored proportion
 
@@ -96,22 +98,19 @@ file_name = sprintf("%ssim_res_%s_%s_%s_%s_%s_%s_%s.RData", my_path, n, k, s11, 
 
 
 
-data_step_func <- function(n, k, s11, s12, s13, b, censoring_prop, seednum){
+data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
   
   set.seed(seednum)
-  s <- s11 + s12 + s13  # total number of true mediators
-  
+
   
   # Baseling Parameters for ZIB Mediator model for m_k=0
-  baseline_prevalence <- rbeta(k, shape1 = 1, shape2 = 10)
-  omega_0_1 <- log( (1 - baseline_prevalence) / baseline_prevalence ) #intercept
+  omega_0_1 <- rep(0, k) #intercept
   omega_1_1 <- rep(0, k)  #X coefficient
   
   
   
   # Baseline Parameters for ZIB Mediator model for m_k>0
-  baseline_abundance <- rbeta(k, shape1 = 1, shape2 = 5)
-  omega_0_2 <- log( baseline_abundance / (1 - baseline_abundance) ) # intercept for abundance part
+  omega_0_2 <- rep(0, k) # intercept for abundance part
   omega_1_2 <- rep(0, k)  # effect of X on log-odds of mean abundance
   
   
@@ -126,41 +125,28 @@ data_step_func <- function(n, k, s11, s12, s13, b, censoring_prop, seednum){
   
   
   # -------------------------------
-  # Choosing Parameters to Establish The 3 Scenarios Below
+  # Choosing Parameters to Test Indirect Effect
   # -------------------------------
-  
-  ## X -> M_k (relative abundance) ->T
-  ra_indices <-1:s11
-  omega_1_2[ra_indices]<- non_zero_unif(s11, min=-2.5, max=2.5)
-  beta[ra_indices]<-non_zero_unif(s11, -0.7, 0.7)
-  tau[ra_indices]<- runif(s11, -0.2, 0.2)
-  omega_0_1[ra_indices] <- non_zero_unif(s11, -1.5, 0.5) 
-  omega_0_2[ra_indices] <- runif(s11, -1.5, -0.5)
+  alpha[0:s11]     <-  -1.5
+  zeta[0:s11]      <- -1.5
   
   
-  ## X -> I(M_k >0) (presence)-> T
-  pres_indices <-(s11+1):(s11+s12)
-  omega_1_1[pres_indices]<-non_zero_unif(s12, -2.5, -2)
-  alpha[pres_indices]<- non_zero_unif(s12, -0.7, 0.7)
-  zeta[pres_indices] <-runif(s12, -0.3, 0.3)
-  omega_0_1[pres_indices] <- runif(s12, 2, 3)
+  beta[0:s11] <-  2
+  tau[0:s11] <-   2
+  
+  set.seed(1)
+  omega_0_1[0:k] <- qlogis(runif(k, .35, .4))  
+  omega_1_1[0:k] <- qlogis(abs(runif(k, 0.0001, 0.75)))
   
   
-  ## X affects both abundance and presence the both affect T 
-  both_indices <-(s11+s12+1): s
-  omega_1_1[both_indices] <- runif(s13, -2.5, -1.5 )
-  omega_1_2[both_indices] <- runif(s13, -1.5, 1.5)
-  alpha[both_indices] <- non_zero_unif(s13, -0.4, 0.8)
-  beta[both_indices] <- non_zero_unif(s13, -0.4, 0.4)
-  zeta[both_indices]  <- runif(s13, -0.3, 0.3)
-  tau[both_indices] <- runif(s13, -0.4, 0.4)
-  omega_0_1[both_indices] <- runif(s13, 0.5, 1.5) 
-  omega_0_2[both_indices] <- non_zero_unif(s13, -1, 0.5)
+  omega_0_2[0:k] <- qlogis(abs(rnorm(k, mean=0, sd=0.011))) 
+  omega_1_2[0:k] <- qlogis(abs(rnorm(k, mean=0, sd=0.2)))
   
   
   
-  X <- matrix(rbinom(n, 1, 0.6), nrow = n, ncol = 1)
-  phi <- 5   # dispersion parameter for beta distribution
+  
+  X <- matrix(rbinom(n, 1, 0.5), nrow = n, ncol = 1)
+  phi <- 100  # dispersion parameter for beta distribution
   
   
   dat <- gen_data(
@@ -200,31 +186,36 @@ data_step_func <- function(n, k, s11, s12, s13, b, censoring_prop, seednum){
 all_res <- list()
 
 all_res <- foreach(i = 1:num_sim, .packages = c( "foreach", "doParallel")) %dopar% {
-  tryCatch(data_step_func(n, k, s11, s12, s13, b, censoring_prop,seednum + i), error=function(e) NA)
+  tryCatch(data_step_func(n, k, s11, b, censoring_prop,seednum + i), error=function(e) NA)
 }
 
 
 ## testing out some outs
 out <-all_res[[1]]
 
-m_k <-as.vector(out$dat$M[,6])
+m_k <-as.vector(out$dat$M[,2])
 x<-as.vector(out$dat$X)
 d<-as.vector(out$dat$d)
 t<-as.vector(out$dat$T_true)
 s<-as.vector(out$dat$s)
-par_vec <-as.vector(unname(out$par_mat[6,]))
+par_vec <-as.vector(unname(out$par_mat[2,]))
 EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
+
 
 # 2. Compute the OBSERVED-DATA Hessian at the final parameter estimates
 H_observed <- hessian(func = observed_loglik, x=EM_result$par,t_vec = t, m_k_vec = m_k, x_vec = x, d_vec = d, s_vec = s)
 
 # 3. Invert the observed Hessian to get the CORRECT covariance matrix
 #    Note: The observed Hessian is -d²L/dΘ², so we invert -H_observed to get Cov(Θ)
-cov_matrix <- ginv(-H_observed)
+#cov_matrix <- ginv(-H_observed)
+
+cov_matrix <- ginv(EM_result$hessian)
 
 NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
 se.nie <-SE_nie(EM_result$par, NIE_func, x1 = 0, x2 = 1, alpha = 0.05, cov_matrix)
 se.nie
+
+
 
 
 

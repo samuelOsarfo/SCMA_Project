@@ -93,14 +93,7 @@ unpack_par <-function(par_vec, n_conf=0){
 }
 
 
-# non-zero uniform values generator over an interval (-a, b) where b>0.
-non_zero_unif <- function(n, min, max){
-  sapply(1:n, function (x){
-    val <-0
-    while(val==0) val <-runif(1, min, max)
-    return(val)
-  })
-}  
+ 
 
 
 
@@ -363,7 +356,7 @@ Estep <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL) {
 Q_func <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL, eta0) {
   n_conf <- if (is.null(conf_mat)) 0 else ncol(conf_mat)
   p <- unpack_par(par_vec, n_conf)
-  
+
   
   n <- length(m_k)
   # group-1 indices
@@ -409,11 +402,13 @@ observed_loglik <- function(par_vec, t_vec, m_k_vec, x_vec, d_vec, s_vec, conf_m
   # Pre-calculate log-likelihoods for all subjects for each possible case
   # Note: For a given subject, only one of these will be used based on m_k_vec[i]
   
+  
   # Likelihood for observed positive mediators (m_k > 0)
   loglik_pos <- li1_1_vec(par_vec, t_vec, m_k_vec, x_vec, conf_matrix, d_vec)
   
   # Likelihood for true-zero mediators (contribution if C_i=0)
   loglik_truezero <- li0_2_vec(par_vec, t_vec, x_vec, conf_matrix, d_vec)
+  
   
   # Likelihood for undetected-zero mediators (contribution if C_i=1)
   loglik_undetected <- li1_2_vec(par_vec, t_vec, x_vec, conf_matrix, d_vec, s_vec)
@@ -456,6 +451,7 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
   converged <- FALSE
   prev_loglik <- -Inf
   
+  #lower_bound <-c(rep(-Inf, 5), 1e-6, rep(-Inf, 4), 1e-6)
   
   while(!converged && iter < max_iter) {
     iter <- iter + 1
@@ -467,7 +463,7 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
     opt_result <- optim(
       par = par_current,
       fn = Q_func,
-      method = "L-BFGS-B",
+      method = "Nelder-Mead",
       x = x,
       m_k = m_k,
       d = d,
@@ -480,11 +476,10 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
     
     # Update parameters
     par_current <- opt_result$par
-    
     current_obs_loglik <- observed_loglik(par_current, t, m_k, x, d, s, conf_mat)   
     hess_final  <- opt_result$hessian
     
-  
+    print(par_current)
     # Check convergence (relative log-likelihood change)
     if(iter > 1 && abs(current_obs_loglik - prev_obs_loglik) < tol) {
       converged <- TRUE
@@ -636,4 +631,6 @@ SE_nie <- function(par_est, nie_function, x1 = 0, x2 = 1, alpha = 0.05,cov_mat) 
   # Return the results invisibly (so they can be stored in a variable)
   return(results)
 }
+
+
 
