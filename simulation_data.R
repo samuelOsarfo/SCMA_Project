@@ -40,51 +40,42 @@ gen_meds <- function(X,
   
   # ---- simulate positive abundances ----
   for (j in seq_len(n)) {
-    #j=1
     idx <- which(Ipos[j, ] == 1)
     
 
-    #weights <- gen_weights(length(idx))
-    fixed_idx <-sample(seq_along(idx), 1)               # select some random index from idx to enforce unit-sum-constraint
+    fixed_idx <-sample(seq_along(idx), 1)     # select some random index from idx to enforce unit-sum-constraint
     comp_results <-numeric(length(idx))
+    
+    #phi <-1000
+    cv <-1.5;
+    phi <-1/(mu[j, idx]*cv^2) - 1
+    
     shape1 <- mu[j, idx] * phi
     shape2 <- (1 - mu[j, idx]) * phi
     
+    # vectorized Beta draws for all but the fixed index:: avoiding loops
+    non_fixed_idx   <- seq_along(idx)[seq_along(idx) != fixed_idx]
     
+    comp_results[non_fixed_idx]<- rbeta(length(non_fixed_idx), shape1[non_fixed_idx], shape2[non_fixed_idx])
     
-    for(col_i in seq_along(idx) ){
-      
-       print(col_i)
-       if(col_i == fixed_idx){
-         print(col_i)
-         next
-       } 
-      
-      
-      beta_sample2<-rbeta(1, shape1[col_i], shape2[col_i])  #sample from the beta distribution
+    # log_df <- data.frame(
+    #   i      = non_fixed_idx,
+    #   beta   = comp_results[non_fixed_idx],
+    #   shape1 = shape1[non_fixed_idx],
+    #   shape2 = shape2[non_fixed_idx],
+    #   mean   = shape1[non_fixed_idx] / (shape1[non_fixed_idx] + shape2[non_fixed_idx]),
+    #   phi    = phi[non_fixed_idx]
+    # )
 
-
-      cat('beta_distr= ',beta_sample2)
-
-
-       comp_results[col_i] <- beta_sample2
-    }
+        #print(log_df)
     
-    sum_others <- sum(comp_results[-fixed_idx])
-    comp_results[fixed_idx] <-  1 - sum_others  
-    
+    # sum_others <- sum(comp_results[-fixed_idx])
+    # comp_results[fixed_idx] <-  1 - sum_others
+
     M[j, idx] <- comp_results
 
       }
-      
-      
-    
-    
-    # Calculate the fixed weight to maintain sum constraint
-    
-    
-    
-    
+  cbind(X, rowSums(M))
   
   
   # return matrices and vectors
