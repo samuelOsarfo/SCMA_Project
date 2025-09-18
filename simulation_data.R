@@ -76,7 +76,7 @@ gen_meds <- function(X,
 
       }
   cbind(X, rowSums(M))
-  
+  max(rowSums(M))
   
   # return matrices and vectors
   list(M = M, Ipos = Ipos, mu = mu, delta = delta)
