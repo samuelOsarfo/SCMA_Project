@@ -5,13 +5,12 @@
 
 gen_meds <- function(X,
                      omega_0_1, omega_1_1,     # zero part: logit P(M=0)
-                     omega_0_2, omega_1_2,     # positive part: logit E[M | M>0]
-                     phi  # precision : scalar
+                     omega_0_2, omega_1_2   # positive part: logit E[M | M>0]
                      ) { 
   n<- length(X)
   k<- length(omega_0_1)
-
   
+
   
   # ---- allocate ----
   delta <- matrix(0, n, k)   # P(M=0)
@@ -36,8 +35,7 @@ gen_meds <- function(X,
   # ---- simulate presence ----
   Ipos[] <- rbinom(n * k, size = 1, prob = 1 - delta)  # 1 = present
   
-  
-  
+  log_phis <- list()
   # ---- simulate positive abundances ----
   for (j in seq_len(n)) {
     idx <- which(Ipos[j, ] == 1)
@@ -46,8 +44,8 @@ gen_meds <- function(X,
     fixed_idx <-sample(seq_along(idx), 1)     # select some random index from idx to enforce unit-sum-constraint
     comp_results <-numeric(length(idx))
     
-    #phi <-1000
-    cv <-1.5;
+    #phi <-0.01
+    cv <-2.5;
     phi <-1/(mu[j, idx]*cv^2) - 1
     
     shape1 <- mu[j, idx] * phi
@@ -56,30 +54,39 @@ gen_meds <- function(X,
     # vectorized Beta draws for all but the fixed index:: avoiding loops
     non_fixed_idx   <- seq_along(idx)[seq_along(idx) != fixed_idx]
     
-    comp_results[non_fixed_idx]<- rbeta(length(non_fixed_idx), shape1[non_fixed_idx], shape2[non_fixed_idx])
     
-    # log_df <- data.frame(
-    #   i      = non_fixed_idx,
-    #   beta   = comp_results[non_fixed_idx],
-    #   shape1 = shape1[non_fixed_idx],
-    #   shape2 = shape2[non_fixed_idx],
-    #   mean   = shape1[non_fixed_idx] / (shape1[non_fixed_idx] + shape2[non_fixed_idx]),
-    #   phi    = phi[non_fixed_idx]
-    # )
-
-        #print(log_df)
+    repeat{
+      
+      comp_results[non_fixed_idx]<- rbeta(length(non_fixed_idx), shape1[non_fixed_idx], shape2[non_fixed_idx])
+      
+      log_df <- data.frame(
+        i      = non_fixed_idx,
+        beta   = comp_results[non_fixed_idx],
+        shape1 = shape1[non_fixed_idx],
+        shape2 = shape2[non_fixed_idx],
+        mean   = shape1[non_fixed_idx] / (shape1[non_fixed_idx] + shape2[non_fixed_idx]),
+        phi    = phi[non_fixed_idx]
+      )
+      log_phis[[j]] <-log_df
+      
+      #print(log_df)
+      
+      sum_others <- sum(comp_results[-fixed_idx])
+      comp_results[fixed_idx] <-  1 - sum_others
+      
+      if (!any(comp_results < 0)) break
+      
+    }
     
-    # sum_others <- sum(comp_results[-fixed_idx])
-    # comp_results[fixed_idx] <-  1 - sum_others
-
     M[j, idx] <- comp_results
 
       }
-  cbind(X, rowSums(M))
-  max(rowSums(M))
+  #cbind('X'=X, 'row_sum'=rowSums(M), 'row_max'=apply(M, 1, min))
+  #max(rowSums(M))
   
+  #phis 
   # return matrices and vectors
-  list(M = M, Ipos = Ipos, mu = mu, delta = delta)
+  list(M = M, Ipos = Ipos, mu = mu, delta = delta, log_phis=log_phis)
 }
 
 
@@ -173,7 +180,6 @@ gen_data <- function(
     # gen_meds parameters
     omega_0_1, omega_1_1,        # zero part: logit P(M=0)
     omega_0_2, omega_1_2,        # positive part: logit E[M|M>0]
-    phi,                         # precision (scalar)
     # gen_T parameters
     gamma,                       # direct X effect
     beta,                        # length k (abundance effects)
@@ -196,8 +202,7 @@ gen_data <- function(
 
   
   # --- mediators ---
-  med <- gen_meds(X = X, omega_0_1 = omega_0_1, omega_1_1 = omega_1_1, omega_0_2 = omega_0_2, omega_1_2 = omega_1_2,
-    phi = phi)
+  med <- gen_meds(X = X, omega_0_1 = omega_0_1, omega_1_1 = omega_1_1, omega_0_2 = omega_0_2, omega_1_2 = omega_1_2)
   
   M    <- med$M
   Ipos <- med$Ipos
@@ -240,8 +245,8 @@ gen_data <- function(
     X=X,
     
     # mediators
-    M = M, Ipos = Ipos, mu = mu, delta = delta,
-    
+    M = M, Ipos = Ipos, mu = mu, delta = delta,   log_phis= med$log_phis,
+
     # event times
     T_true = T_true, log_T = log_T,
     

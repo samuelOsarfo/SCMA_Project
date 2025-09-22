@@ -23,7 +23,7 @@ foreach::getDoParWorkers()             # check number of workers
 
 seednum <- 2025 # set the number for set.seed()
 
-num_sim <- 5 # the total number of independent simulation runs
+num_sim <- 50 # the total number of independent simulation runs
 
 #my_path <- "/home/sosarfo/hdjmt/" # the directory in the server where the source code is located
 
@@ -48,7 +48,7 @@ censoring_prop = as.numeric(args[7])
 
 
 n<-200                # sample size
-k <- 200        # total number of mediators
+k <- 800        # total number of mediators
 s11 <-5              # number of true mediators under scenario 1
 #s12 <-3              # number of true mediators under scenario 2
 #s13 <-4              # number of true mediators under scenario 1
@@ -101,15 +101,20 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
   tau[0:s11] <-   2
   
   #set.seed(1)
-  # omega_0_1[0:k] <- qlogis(0.45)
-  # omega_1_1[0:k] <- qlogis(0.65)-qlogis(0.45)
+  omega_0_1[0:k] <- qlogis(0.45) #seem to work max{k<-6500}
+  omega_1_1[0:k] <- qlogis(0.55)-qlogis(0.45)
+
   
+  # omega_0_1[0:k] <- qlogis(0.75)
+  # omega_1_1[0:k] <- qlogis(0.55)-qlogis(0.75)
+  # 
   
-  omega_0_1[0:k] <- qlogis(0.75)
-  omega_1_1[0:k] <- qlogis(0.55)-qlogis(0.75)
+  # omega_0_2[0:k] <- qlogis(0.02)
+  # omega_1_2[0:k] <- qlogis(0.03)-qlogis(0.02)
   
-  omega_0_2[0:k] <- qlogis(0.00025)
-  omega_1_2[0:k] <- qlogis(0.0003)-qlogis(0.00025)
+  omega_0_2[0:k] <- qlogis(c(rep(0.01, round(k*0.05)), rep(0.001, round(k*0.20)), rep(0.00015, round(k*0.25)), rep(0.00015, round(k*0.5))))
+  omega_1_2[0:k] <- qlogis(c(rep(0.02, round(k*0.05)), rep(0.002, round(k*0.20)), rep(0.0002, round(k*0.25)), rep(0.0002, round(k*0.5)))) - omega_0_2
+  
   
   # omega_0_2[0:k] <- qlogis(0.00015)
   # omega_1_2[0:k] <- qlogis(0.00025)-qlogis(0.00015)
@@ -132,7 +137,6 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
     # gen_meds parameters
     omega_0_1, omega_1_1,        # zero part: logit P(M=0)
     omega_0_2, omega_1_2,        # positive part: logit E[M|M>0]
-    phi,                         # precision (scalar)
     # gen_T parameters
     gamma,                       # direct X effect
     beta,                        # length k (abundance effects)
@@ -145,7 +149,7 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
   ) 
   
   #parameter matrix
-  par_mat <-data.frame(gamma=rep(gamma, k), beta, alpha, tau, zeta, b=rep( b,k), omega_0_1, omega_1_1, omega_0_2, omega_1_2, phi=rep( phi, k))
+  par_mat <-data.frame(gamma=rep(gamma, k), beta, alpha, tau, zeta, b=rep( b,k), omega_0_1, omega_1_1, omega_0_2, omega_1_2)
   
   par_mat <-as.matrix(par_mat)
   
