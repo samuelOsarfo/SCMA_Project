@@ -21,7 +21,7 @@ foreach::getDoParWorkers()             # check number of workers
 
 
 
-seednum <- 2025 # set the number for set.seed()
+seednum <- 2026 # set the number for set.seed()
 
 num_sim <- 50 # the total number of independent simulation runs
 
@@ -48,13 +48,13 @@ censoring_prop = as.numeric(args[7])
 
 
 n<-200                # sample size
-k <- 800        # total number of mediators
+k <- 460        # total number of mediators
 s11 <-5              # number of true mediators under scenario 1
 #s12 <-3              # number of true mediators under scenario 2
 #s13 <-4              # number of true mediators under scenario 1
 b <- 0.8             # scale parameter for log-weibull distribution (in AFT model)
 censoring_prop <- round(runif(1, 0.1, 0.25),2)     # censored proportion
-
+phi <-250
 
 
 
@@ -64,7 +64,7 @@ file_name = sprintf("%ssim_res_%s_%s_%s_%s_%s_%s_%s.RData", my_path, n, k, s11, 
 
 
 
-data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
+data_step_func <- function(n, k, s11, b, censoring_prop, phi, seednum){
   
   set.seed(seednum)
 
@@ -112,9 +112,28 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
   # omega_0_2[0:k] <- qlogis(0.02)
   # omega_1_2[0:k] <- qlogis(0.03)-qlogis(0.02)
   
-  omega_0_2[0:k] <- qlogis(c(rep(0.01, round(k*0.05)), rep(0.001, round(k*0.20)), rep(0.00015, round(k*0.25)), rep(0.00015, round(k*0.5))))
-  omega_1_2[0:k] <- qlogis(c(rep(0.02, round(k*0.05)), rep(0.002, round(k*0.20)), rep(0.0002, round(k*0.25)), rep(0.0002, round(k*0.5)))) - omega_0_2
+  # target mix of effect sizes (must sum to 1)
+  props <- c(0.05, 0.20, 0.25, 0.50)
   
+  # probabilities for each size bucket
+  p0 <- c(0.04,   0.004,   0.00025, 0.00025)  # baseline
+  p1 <- c(0.05,   0.005,   0.00030, 0.00030)  # alt
+  
+  # get exact counts that SUM to k (no rounding issues)
+  cnt <- as.vector(rmultinom(1, k, props))  # length-4 counts
+  
+  # label each position with its bucket 1..4
+  labels <- rep.int(1:4, cnt)
+  
+  # SHUFFLE ONCE so both omega_* share the same random order
+  labels <- labels[sample.int(k)]
+  
+  omega_0_2 <- qlogis(p0[labels])
+  omega_1_2 <- qlogis(p1[labels]) - omega_0_2
+  
+  # omega_0_2[0:k] <- qlogis(c(rep(0.04, round(k*0.05)), rep(0.003, round(k*0.20)), rep(0.00025, round(k*0.25)), rep(0.00025, round(k*0.5))))
+  # omega_1_2[0:k] <- qlogis(c(rep(0.05, round(k*0.05)), rep(0.004, round(k*0.20)), rep(0.0003, round(k*0.25)), rep(0.0003, round(k*0.5)))) - omega_0_2
+
   
   # omega_0_2[0:k] <- qlogis(0.00015)
   # omega_1_2[0:k] <- qlogis(0.00025)-qlogis(0.00015)
@@ -137,6 +156,7 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
     # gen_meds parameters
     omega_0_1, omega_1_1,        # zero part: logit P(M=0)
     omega_0_2, omega_1_2,        # positive part: logit E[M|M>0]
+    phi,
     # gen_T parameters
     gamma,                       # direct X effect
     beta,                        # length k (abundance effects)
@@ -149,7 +169,7 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
   ) 
   
   #parameter matrix
-  par_mat <-data.frame(gamma=rep(gamma, k), beta, alpha, tau, zeta, b=rep( b,k), omega_0_1, omega_1_1, omega_0_2, omega_1_2)
+  par_mat <-data.frame(gamma=rep(gamma, k), beta, alpha, tau, zeta, omega_0_1, omega_1_1, omega_0_2, omega_1_2)
   
   par_mat <-as.matrix(par_mat)
   
@@ -168,19 +188,19 @@ data_step_func <- function(n, k, s11, b, censoring_prop, seednum){
 all_res <- list()
 
 all_res <- foreach(i = 1:num_sim, .packages = c( "foreach", "doParallel")) %dopar% {
-  tryCatch(data_step_func(n, k, s11, b, censoring_prop,seednum + i), error=function(e) NA)
+  tryCatch(data_step_func(n, k, s11, b, censoring_prop,phi,seednum + i), error=function(e) NA)
 }
 
 
 ## testing out some outs
 out <-all_res[[1]]
 
-m_k <-as.vector(out$dat$M[,2])
-x<-as.vector(out$dat$X)
-d<-as.vector(out$dat$d)
-t<-as.vector(out$dat$T_true)
-s<-as.vector(out$dat$s)
-par_vec <-as.vector(unname(out$par_mat[2,]))
+m_k <-m_k_vec<-as.vector(out$dat$M[,1])
+x <-x_vec<-as.vector(out$dat$X)
+d <-d_vec<-as.vector(out$dat$d)
+t<-t_vec<-as.vector(out$dat$T_true)
+s <- s_vec<-as.vector(out$dat$s)
+par_vec <-as.numeric(out$par_mat[1,])
 EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
 
 

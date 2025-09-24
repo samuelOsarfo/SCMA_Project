@@ -1,15 +1,14 @@
 ## -------------------------------------------------------------------
 ## 1.  Positive mediators  (R = 1)  –– li1_1
 ## -------------------------------------------------------------------
-# par_vec : initial parameter vector  [gamma, theta, beta_k, alpha_k, tau_k, zeta_k, b_k,
+# par_vec : initial parameter vector  [gamma, theta, beta_k, alpha_k, tau_k, zeta_k,
 #                                     omega0_k1, omega1_k1, omega2_k1 (vector),
-#                                     omega0_k2, omega1_k2, omega2_k2 (vector),
-#                                     phi]
+#                                     omega0_k2, omega1_k2, omega2_k2 (vector)]
 
 
 li1_1_vec <- function(par_vec,
                       t_vec, m_k_vec, x_vec,
-                      conf_matrix, d_vec) {
+                      conf_matrix=NULL, d_vec) {
   
   n <- length(t_vec)              
  
@@ -24,16 +23,19 @@ li1_1_vec <- function(par_vec,
     numeric(1L))                            # FUN.VALUE: one number back
 }
 
-
+# li1_1_vec(par_vec,
+#                       t_vec[g1], m_k_vec[g1], x_vec[g1],
+#                       conf_matrix=NULL, d_vec[g1])
 
 ## -------------------------------------------------------------------
 ## 2.  True-zero mediators (R = 0) –– li0_2
 ## -------------------------------------------------------------------
 
 
+
 li0_2_vec <- function(par_vec,
                       t_vec, x_vec,
-                      conf_matrix, d_vec) {
+                      conf_matrix=NULL, d_vec) {
   
   n <- length(t_vec)
   vapply(seq_len(n), function(i)
@@ -46,6 +48,9 @@ li0_2_vec <- function(par_vec,
 }
 
 
+# li0_2_vec(par_vec,
+#                       t_vec[g2], x_vec[g2],
+#                       conf_matrix=NULL, d_vec[g2])
 ## -------------------------------------------------------------------
 ## 3.  Undetected-zero mediators (R = 0) –– li1_2
 ## -------------------------------------------------------------------
@@ -53,7 +58,7 @@ li0_2_vec <- function(par_vec,
 
 li1_2_vec <- function(par_vec,
                       t_vec, x_vec,
-                      conf_matrix, d_vec, s_vec) {
+                      conf_matrix=NULL, d_vec, s_vec) {
   
   n <- length(t_vec)
   vapply(seq_len(n), function(i)
@@ -67,7 +72,9 @@ li1_2_vec <- function(par_vec,
 }
 
 
-
+# li1_2_vec(par_vec,
+#                       t_vec[g2], x_vec[g2],
+#                       conf_matrix=NULL, d_vec[g2], s_vec[g2])
 
 unpack_par <-function(par_vec, n_conf=0){
   list(
@@ -77,20 +84,19 @@ unpack_par <-function(par_vec, n_conf=0){
     alpha_k = par_vec[3 + n_conf],
     tau_k = par_vec[4 + n_conf],
     zeta_k = par_vec[5 + n_conf],
-    b_k = par_vec[6 + n_conf],
-    
+
     # zero-inflation parameters (Equation 15)
-    omega0_k1 = par_vec[7 + n_conf],
-    omega1_k1 = par_vec[8 + n_conf],
-    omega2_k1 = if(n_conf >0) par_vec[9 + n_conf + (0:(n_conf-1))] else  numeric(0),
+    omega0_k1 = par_vec[6 + n_conf],
+    omega1_k1 = par_vec[7 + n_conf],
+    omega2_k1 = if(n_conf >0) par_vec[8 + n_conf + (0:(n_conf-1))] else  numeric(0),
     
     # non-zero mean parameters (Equation 16)
-    omega0_k2 = par_vec[9 + 2*n_conf],
-    omega1_k2 = par_vec[10 + 2*n_conf ],
-    omega2_k2= if(n_conf>0) par_vec[(11 + 2*n_conf):(10+ 3*n_conf)] else numeric(0),
-    phi = par_vec[11 + 3*n_conf]
+    omega0_k2 = par_vec[8 + 2*n_conf],
+    omega1_k2 = par_vec[9 + 2*n_conf ],
+    omega2_k2= if(n_conf>0) par_vec[(10 + 2*n_conf):(9+ 3*n_conf)] else numeric(0)
   )
 }
+
 
 
  
@@ -122,6 +128,8 @@ li1_1 <-function(par_vec, ti, m_ik, xi, conf_vec=NULL,di){
   
   n_conf <- length(conf_vec)
   p <- unpack_par(par_vec, n_conf)
+  p$b_k <-0.8
+  p$phi <-250
   
   ###  calculate mediator parameters
   # zero-inflation probability (logistic) :: (Equations 15-16)
@@ -173,6 +181,11 @@ li1_1 <-function(par_vec, ti, m_ik, xi, conf_vec=NULL,di){
 }
 
 
+m_ik <-as.vector(out$dat$M[,1])[1]
+xi<-as.vector(out$dat$X)[1]
+di<-as.vector(out$dat$d)[1]
+ti<-as.vector(out$dat$T_true)[1]
+si<-as.vector(out$dat$s)[1]
 
 
 ################################################################################################
@@ -183,8 +196,8 @@ li0_2 <- function(par_vec, ti, xi, conf_vec=NULL,di) {
   # get parameters
   n_conf <- length(conf_vec)
   p <- unpack_par(par_vec, n_conf)
-  
-  
+  b_k <-0.8
+
   
   
   # calculate Delta_ik (prob of true zero)
@@ -199,12 +212,12 @@ li0_2 <- function(par_vec, ti, xi, conf_vec=NULL,di) {
   outcome_model <- p$gamma * xi
   if(n_conf > 0) outcome_model <- outcome_model + sum(p$theta * conf_vec)
   
-  epsilon_ik <- (yi - outcome_model) / p$b_k
+  epsilon_ik <- (yi - outcome_model) / b_k
   
   
   #survival componetn
   if (di == 1) {
-    log_surv <- -log(p$b_k) + dnorm(epsilon_ik, log = TRUE)
+    log_surv <- -log(b_k) + dnorm(epsilon_ik, log = TRUE)
   } else {
     log_surv <- pnorm(epsilon_ik, lower.tail = FALSE, log.p = TRUE)
   }
@@ -231,6 +244,8 @@ li1_2 <- function(par_vec, ti, xi, conf_vec=NULL, di, si) {
   # get parameters
   n_conf <- length(conf_vec)
   p <- unpack_par(par_vec, n_conf)
+  b_k <-0.8
+  phi <-250
   
   #  calculate mediator parameters (plogis for expit)
   logit_delta <- p$omega0_k1 + p$omega1_k1 * xi
@@ -253,12 +268,12 @@ li1_2 <- function(par_vec, ti, xi, conf_vec=NULL, di, si) {
     
     
     yi <- log(ti)
-    epsilon_ik <- (yi - outcome_model) / p$b_k
+    epsilon_ik <- (yi - outcome_model) /b_k
     
     # survival component
     if (di == 1) {
       # observed event
-      surv_part <- (1/p$b_k) * dnorm(epsilon_ik)
+      surv_part <- (1/b_k) * dnorm(epsilon_ik)
     } else {
       # censored
       surv_part <- pnorm(epsilon_ik, lower.tail = FALSE)
@@ -281,7 +296,7 @@ li1_2 <- function(par_vec, ti, xi, conf_vec=NULL, di, si) {
   )
   
   # Beta density for mediator
-  beta_part <- beta(mu_ik * p$phi, (1 - mu_ik) * p$phi)
+  beta_part <- beta(mu_ik * phi, (1 - mu_ik) * phi)
   
   # likelihood component
   joint_density <- (1 - delta_ik) *(1/beta_part) *int_result
@@ -319,9 +334,9 @@ Estep <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL) {
   
   
   n <- length(m_k)
-  g1 <- which(m_k != 0)
-  g2 <- which(m_k == 0)
-  
+  g1 <- which(m_k*s >=1)
+  g2 <- which( m_k*s <1)
+
   
   # Compute pi (P(Ci=0) using logistic model
   logit_pi <- p$omega0_k1 + p$omega1_k1 * x
@@ -360,10 +375,11 @@ Q_func <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL, eta0) {
   
   n <- length(m_k)
   # group-1 indices
-  g1 <- which(m_k !=0)
+  g1 <- which(m_k*s >=1)
+  
   
   # group-2 indices
-  g2  <- which(m_k == 0)
+  g2  <-  which( m_k*s <1)
   
   
   
@@ -451,7 +467,8 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
   converged <- FALSE
   prev_loglik <- -Inf
   
-  #lower_bound <-c(rep(-Inf, 5), 1e-6, rep(-Inf, 4), 1e-6)
+  lower_bound <-c(rep(-5, 9))
+  upper_bound <-c(rep(5, 9))
   
   while(!converged && iter < max_iter) {
     iter <- iter + 1
@@ -463,7 +480,9 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
     opt_result <- optim(
       par = par_current,
       fn = Q_func,
-      method = "Nelder-Mead",
+      method = "L-BFGS-B",
+      lower = lower_bound,
+      upper = upper_bound,
       x = x,
       m_k = m_k,
       d = d,
@@ -510,18 +529,18 @@ EM_algorithm <- function(par_init, x, m_k, d, t, s, conf_mat=NULL,  tol = 1e-6, 
 
 
 # # After EM converges:
-# EM_stderror <-function(em_result){
-#   
-#   hessian <- em_result$hessian  # Extract Hessian (this is already -d²Q/dΘ²)
-#   
-#   
-#   cov_matrix <- ginv(hessian)   # Invert to get covariance matrix
-#   
-#   sqrt(diag(cov_matrix))
-#   
-# }
-# 
-# 
+EM_stderror <-function(em_result){
+
+  hessian <- em_result$hessian  # Extract Hessian (this is already -d²Q/dΘ²)
+
+
+  cov_matrix <- ginv(hessian)   # Invert to get covariance matrix
+
+  sqrt(diag(cov_matrix))
+
+}
+
+
 # stdError <-EM_stderror(EM_result)
 
 #-------------------------------------
@@ -536,10 +555,10 @@ NIE_func <- function(par, x1 = 0, x2 = 1) {
   tau_k  <- par[4]   # tau
   alpha_k <- par[3]  # alpha
   zeta_k <- par[5]   # zeta
-  omega0_1 <- par[7] # omega_0_1
-  omega1_1 <- par[8] # omega_1_1
-  omega0_2 <- par[9] # omega_0_2
-  omega1_2 <- par[10] # omega_1_2
+  omega0_1 <- par[6] # omega_0_1
+  omega1_1 <- par[7] # omega_1_1
+  omega0_2 <- par[8] # omega_0_2
+  omega1_2 <- par[9] # omega_1_2
 
   
  
@@ -579,11 +598,13 @@ NIE_func <- function(par, x1 = 0, x2 = 1) {
 
 # m_k <-as.vector(out$dat$M[,10])
 # par_vec <-as.vector(unname(out$par_mat[10,]))
-# EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
-# stdError <-EM_stderror(EM_result)
-# NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
-# se.nie <-SE_nie(EM_result$par, EM_result$hessian, NIE_func, x1 = 0, x2 = 1, alpha = 0.05)
-# se.nie
+EM_result <- EM_algorithm(par_vec, x, m_k, d, t, s)
+stdError <-EM_stderror(EM_result)
+NIE <- NIE_func(EM_result$par, x1 = 0, x2 = 1)
+cov_matrix <- ginv(EM_result$hessian)
+
+se.nie <-SE_nie(EM_result$par, NIE_func, x1 = 0, x2 = 1, alpha = 0.05,cov_matrix)
+se.nie
 
 
 
