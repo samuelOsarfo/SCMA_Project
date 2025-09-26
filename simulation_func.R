@@ -48,7 +48,7 @@ censoring_prop = as.numeric(args[7])
 
 
 n<-200                # sample size
-k <- 460        # total number of mediators
+k <- 500        # total number of mediators
 s11 <-5              # number of true mediators under scenario 1
 #s12 <-3              # number of true mediators under scenario 2
 #s13 <-4              # number of true mediators under scenario 1
@@ -93,27 +93,27 @@ data_step_func <- function(n, k, s11, b, censoring_prop, phi, seednum){
   # -------------------------------
   # Choosing Parameters to Test Indirect Effect
   # -------------------------------
-  alpha[0:s11]     <-  -1.5
-  zeta[0:s11]      <- -1.5
+  alpha[1:s11]     <-  -1.5
+  zeta[1:s11]      <- -1.5
   
   
-  beta[0:s11] <-  2
-  tau[0:s11] <-   2
+  beta[1:s11] <-  2
+  tau[1:s11] <-   2
   
   #set.seed(1)
-  omega_0_1[0:k] <- qlogis(0.45) #seem to work max{k<-6500}
-  omega_1_1[0:k] <- qlogis(0.55)-qlogis(0.45)
+  omega_0_1[1:k] <- qlogis(0.80) #seem to work max{k<-6500}
+  omega_1_1[1:k] <- qlogis(0.85)-qlogis(0.80)
 
   
-  # omega_0_1[0:k] <- qlogis(0.75)
-  # omega_1_1[0:k] <- qlogis(0.55)-qlogis(0.75)
+  # omega_0_1[1:k] <- qlogis(0.75)
+  # omega_1_1[1:k] <- qlogis(0.55)-qlogis(0.75)
   # 
   
-  # omega_0_2[0:k] <- qlogis(0.02)
-  # omega_1_2[0:k] <- qlogis(0.03)-qlogis(0.02)
+  # omega_0_2[1:k] <- qlogis(0.02)
+  # omega_1_2[1:k] <- qlogis(0.03)-qlogis(0.02)
   
   # target mix of effect sizes (must sum to 1)
-  props <- c(0.05, 0.20, 0.25, 0.50)
+  props <- c(0.25, 0.35, 0.25, 0.2)
   
   # probabilities for each size bucket
   p0 <- c(0.04,   0.004,   0.00025, 0.00025)  # baseline
@@ -131,18 +131,18 @@ data_step_func <- function(n, k, s11, b, censoring_prop, phi, seednum){
   omega_0_2 <- qlogis(p0[labels])
   omega_1_2 <- qlogis(p1[labels]) - omega_0_2
   
-  # omega_0_2[0:k] <- qlogis(c(rep(0.04, round(k*0.05)), rep(0.003, round(k*0.20)), rep(0.00025, round(k*0.25)), rep(0.00025, round(k*0.5))))
-  # omega_1_2[0:k] <- qlogis(c(rep(0.05, round(k*0.05)), rep(0.004, round(k*0.20)), rep(0.0003, round(k*0.25)), rep(0.0003, round(k*0.5)))) - omega_0_2
+  # omega_0_2[1:k] <- qlogis(c(rep(0.04, round(k*0.05)), rep(0.003, round(k*0.20)), rep(0.00025, round(k*0.25)), rep(0.00025, round(k*0.5))))
+  # omega_1_2[1:k] <- qlogis(c(rep(0.05, round(k*0.05)), rep(0.004, round(k*0.20)), rep(0.0003, round(k*0.25)), rep(0.0003, round(k*0.5)))) - omega_0_2
 
   
-  # omega_0_2[0:k] <- qlogis(0.00015)
-  # omega_1_2[0:k] <- qlogis(0.00025)-qlogis(0.00015)
+  # omega_0_2[1:k] <- qlogis(0.00015)
+  # omega_1_2[1:k] <- qlogis(0.00025)-qlogis(0.00015)
   
-  # omega_0_2[0:k] <- qlogis(0.00025)
-  # omega_1_2[0:k] <- qlogis(0.00015)-qlogis(0.00025)
+  # omega_0_2[1:k] <- qlogis(0.00025)
+  # omega_1_2[1:k] <- qlogis(0.00015)-qlogis(0.00025)
   
-  # omega_0_2[0:k] <- qlogis(0.00015)
-  # omega_1_2[0:k] <- sample(c(qlogis(0.00025)-qlogis(0.00015), -qlogis(0.00025)+qlogis(0.00015)), k,replace = T )
+  # omega_0_2[1:k] <- qlogis(0.00015)
+  # omega_1_2[1:k] <- sample(c(qlogis(0.00025)-qlogis(0.00015), -qlogis(0.00025)+qlogis(0.00015)), k,replace = T )
 
   
   
@@ -156,7 +156,7 @@ data_step_func <- function(n, k, s11, b, censoring_prop, phi, seednum){
     # gen_meds parameters
     omega_0_1, omega_1_1,        # zero part: logit P(M=0)
     omega_0_2, omega_1_2,        # positive part: logit E[M|M>0]
-    phi,
+    #phi,
     # gen_T parameters
     gamma,                       # direct X effect
     beta,                        # length k (abundance effects)

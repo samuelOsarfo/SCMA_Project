@@ -47,8 +47,8 @@ gen_meds <- function(X,
     comp_results <-numeric(length(idx))
     
     #phi <-200
-    # cv <-2;
-    # phi <-1/(mu[j, idx]*cv^2) - 1
+    cv <-0.8;
+    phi <-1/(mu[j, idx]*cv^2) - 1
     
     # log_phis[j, ] <-1/(mu[j, ]*cv^2) - 1
     
@@ -86,7 +86,7 @@ gen_meds <- function(X,
       }
   cbind('X'=X, 'row_sum'=rowSums(M), 'row_max'=apply(M, 1, max))
   #cbind('col_max'=apply(M,2, max))
-  #max(rowSums(M))
+  max(apply(M, 1, max))
   
   #phis 
   # return matrices and vectors
@@ -184,7 +184,7 @@ gen_data <- function(
     # gen_meds parameters
     omega_0_1, omega_1_1,        # zero part: logit P(M=0)
     omega_0_2, omega_1_2,        # positive part: logit E[M|M>0]
-    phi,
+   # phi,
     # gen_T parameters
     gamma,                       # direct X effect
     beta,                        # length k (abundance effects)
@@ -207,7 +207,8 @@ gen_data <- function(
 
   
   # --- mediators ---
-  med <- gen_meds(X = X, omega_0_1 = omega_0_1, omega_1_1 = omega_1_1, omega_0_2 = omega_0_2, omega_1_2 = omega_1_2, phi)
+  med <- gen_meds(X = X, omega_0_1 = omega_0_1, omega_1_1 = omega_1_1, omega_0_2 = omega_0_2, omega_1_2 = omega_1_2)
+                  #, phi)
   
   M    <- med$M
   Ipos <- med$Ipos
@@ -250,7 +251,7 @@ gen_data <- function(
     X=X,
     
     # mediators
-    M = M, Ipos = Ipos, mu = mu, delta = delta,   phi=phi,
+    M = M, Ipos = Ipos, mu = mu, delta = delta,   #phi=phi,
 
     # event times
     T_true = T_true, log_T = log_T,

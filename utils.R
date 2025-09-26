@@ -338,13 +338,14 @@ Estep <- function(par_vec, x, m_k, d, t, s, conf_mat=NULL) {
   g2 <- which( m_k*s <1)
 
   
+  
   # Compute pi (P(Ci=0) using logistic model
   logit_pi <- p$omega0_k1 + p$omega1_k1 * x
   if (n_conf > 0) logit_pi <- logit_pi + conf_mat %*% p$omega2_k1
   pi_vec <- plogis(logit_pi)
   
   
-  eta0 <- numeric(n)
+  eta0 <- numeric(length(m_k))
   eta0[g1] <- 0
   
   
